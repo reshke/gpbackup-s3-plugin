@@ -312,12 +312,18 @@ func downloadFile(sess *session.Session, bucket string, fileKey string,
 	}
 	gplog.Verbose("File %s size = %d bytes", filepath.Base(fileKey), totalBytes)
 	if totalBytes <= DownloadChunkSize {
-		_, err = downloader.Download(
-			file,
+		buffer:= &aws.WriteAtBuffer{}
+		if _, err = downloader.Download(
+			buffer,
 			&s3.GetObjectInput{
 				Bucket: aws.String(bucket),
 				Key:    aws.String(fileKey),
-			})
+			}); err != nil {
+			return 0, -1, err
+		}
+		if _, err = file.Write(buffer.Bytes()); err != nil {
+			return 0, -1, err
+		}
 	} else {
 		return downloadFileInParallel(downloader, totalBytes, bucket, fileKey, file)
 	}
