@@ -98,12 +98,111 @@ func BackupFile(c *cli.Context) error {
 	}
 	totalBytes, elapsed, err := uploadFile(sess, config.Options["bucket"], fileKey, file)
 	if err == nil {
-		gplog.Verbose("Uploaded %d bytes for %s in %v", totalBytes,
-			filepath.Base(fileKey), elapsed.Round(time.Millisecond))
+		msg := fmt.Sprintf("Uploaded %d bytes for %s in %v", totalBytes,
+			filepath.Base(fileName), elapsed.Round(time.Millisecond))
+		gplog.Verbose(msg)
+		fmt.Println(msg)
 	} else {
 		gplog.FatalOnError(err)
 	}
 	return err
+}
+
+func isDirectoryGetSize(path string) (bool, int64) {
+	fd, err := os.Stat(path)
+	if err != nil {
+		gplog.FatalOnError(err)
+	}
+	switch mode := fd.Mode(); {
+	case mode.IsDir():
+		return true, 0
+	case mode.IsRegular():
+		return false, fd.Size()
+	}
+	gplog.FatalOnError(errors.New(fmt.Sprintf("INVALID file %s", path)))
+	return false, 0
+}
+
+func BackupDirectory(c *cli.Context) error {
+	gplog.InitializeLogging("gpbackup", "")
+	config, sess, err := readConfigAndStartSession(c)
+	if err != nil {
+		return err
+	}
+	dirName := c.Args().Get(1)
+	fmt.Printf("dirKey = %s\n", dirName)
+	fileList := make([]string, 0)
+	_ = filepath.Walk(dirName, func(path string, f os.FileInfo, err error) error {
+		isDir, _ := isDirectoryGetSize(path)
+		if !isDir {
+			fileList = append(fileList, path)
+		}
+		return nil
+	})
+	for _, fileName := range fileList {
+		file, err := os.Open(fileName)
+		if err != nil {
+			return err
+		}
+		totalBytes, elapsed, err := uploadFile(sess, config.Options["bucket"], fileName, file)
+		if err == nil {
+			msg := fmt.Sprintf("Uploaded %d bytes for %s in %v", totalBytes,
+				filepath.Base(fileName), elapsed.Round(time.Millisecond))
+			gplog.Verbose(msg)
+			fmt.Println(msg)
+		}
+		_ = file.Close()
+	}
+	return err
+}
+
+func BackupDirectoryParallel(c *cli.Context) error {
+	gplog.InitializeLogging("gpbackup", "")
+	config, sess, err := readConfigAndStartSession(c)
+	if err != nil {
+		return err
+	}
+	dirName := c.Args().Get(1)
+	bucket := config.Options["bucket"]
+	gplog.Verbose("Backup Directory '%s' to S3", dirName)
+	gplog.Verbose("S3 Location = s3://%s/%s", bucket, dirName)
+
+	// Create a list of files to be backed up
+	fileList := make([]string, 0)
+	_ = filepath.Walk(dirName, func(path string, f os.FileInfo, err error) error {
+		isDir, _ := isDirectoryGetSize(path)
+		if !isDir {
+			fileList = append(fileList, path)
+		}
+		return nil
+	})
+
+	// Process the files in parallel
+	var wg sync.WaitGroup
+	var finalErr error
+	for _, fileName := range fileList {
+		wg.Add(1)
+		go func(fileKey string) {
+			defer wg.Done()
+			file, err := os.Open(fileKey)
+			if err != nil {
+				finalErr = err
+				return
+			}
+			totalBytes, elapsed, err := uploadFile(sess, bucket, fileKey, file)
+			if err == nil {
+				msg := fmt.Sprintf("Uploaded %d bytes for %s in %v", totalBytes,
+					filepath.Base(fileName), elapsed.Round(time.Millisecond))
+				gplog.Verbose(msg)
+				fmt.Println(msg)
+			} else {
+				finalErr = err
+			}
+			_ = file.Close()
+		}(fileName)
+	}
+	wg.Wait()
+	return finalErr
 }
 
 func RestoreFile(c *cli.Context) error {
@@ -123,13 +222,136 @@ func RestoreFile(c *cli.Context) error {
 	}
 	totalBytes, elapsed, err := downloadFile(sess, config.Options["bucket"], fileKey, file)
 	if err == nil {
-		gplog.Verbose("Downloaded %d bytes for file %s in %v", totalBytes,
+		msg := fmt.Sprintf("Downloaded %d bytes for %s in %v", totalBytes,
 			filepath.Base(fileKey), elapsed.Round(time.Millisecond))
+		gplog.Verbose(msg)
+		fmt.Println(msg)
 	} else {
 		gplog.FatalOnError(err)
 		_ = os.Remove(fileName)
 	}
 	return err
+}
+
+func RestoreDirectory(c *cli.Context) error {
+	gplog.InitializeLogging("gprestore", "")
+	start := time.Now()
+	total := int64(0)
+	config, sess, err := readConfigAndStartSession(c)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		fmt.Printf("Downloaded %d bytes in %v\n", total,
+			time.Since(start).Round(time.Millisecond))
+	}()
+	dirName := c.Args().Get(1)
+	bucket := config.Options["bucket"]
+	gplog.Verbose("Restore Directory '%s' from S3", dirName)
+	gplog.Verbose("S3 Location = s3://%s/%s", bucket, dirName)
+	_ = os.MkdirAll(dirName, 0775)
+	fmt.Printf("dirKey = %s\n", dirName)
+	client := s3.New(sess)
+	params := &s3.ListObjectsV2Input{Bucket: &bucket, Prefix: &dirName}
+	bucketObjectsList, _ := client.ListObjectsV2(params)
+
+	for _, key := range bucketObjectsList.Contents {
+		var filename string
+		if strings.HasSuffix(*key.Key, "/") {
+			// Got a directory
+			continue
+		}
+		if strings.Contains(*key.Key, "/") {
+			// split
+			s3FileFullPathList := strings.Split(*key.Key, "/")
+			filename = s3FileFullPathList[len(s3FileFullPathList)-1]
+		}
+		filePath := dirName + "/" + filename
+		file, err := os.Create(filePath)
+		if err != nil {
+			return err
+		}
+		totalBytes, elapsed, err := downloadFile(sess, config.Options["bucket"], *key.Key, file)
+		if err == nil {
+			total += totalBytes
+			msg := fmt.Sprintf("Downloaded %d bytes for %s in %v", totalBytes,
+				filepath.Base(*key.Key), elapsed.Round(time.Millisecond))
+			gplog.Verbose(msg)
+			fmt.Println(msg)
+		} else {
+			_ = os.Remove(filename)
+		}
+		_ = file.Close()
+	}
+	return err
+}
+
+func RestoreDirectoryParallel(c *cli.Context) error {
+	gplog.InitializeLogging("gprestore", "")
+	start := time.Now()
+	total := int64(0)
+	config, sess, err := readConfigAndStartSession(c)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		fmt.Printf("Downloaded %d bytes in %v\n", total,
+			time.Since(start).Round(time.Millisecond))
+	}()
+	dirName := c.Args().Get(1)
+	bucket := config.Options["bucket"]
+	gplog.Verbose("Restore Directory '%s' from S3", dirName)
+	gplog.Verbose("S3 Location = s3://%s/%s", bucket, dirName)
+	_ = os.MkdirAll(dirName, 0775)
+	client := s3.New(sess)
+	params := &s3.ListObjectsV2Input{Bucket: &bucket, Prefix: &dirName}
+	bucketObjectsList, _ := client.ListObjectsV2(params)
+
+	// Create a list of files to be restored
+	fileList := make([]string, 0)
+	for _, key := range bucketObjectsList.Contents {
+		gplog.Verbose("File '%s' = %d bytes", filepath.Base(*key.Key), *key.Size)
+		if strings.HasSuffix(*key.Key, "/") {
+			// Got a directory
+			continue
+		}
+		fileList = append(fileList, *key.Key)
+	}
+
+	// Process the files in parallel
+	var wg sync.WaitGroup
+	var finalErr error
+	for _, fileKey := range fileList {
+		wg.Add(1)
+		go func(fileKey string) {
+			defer wg.Done()
+			fileName := fileKey
+			if strings.Contains(fileKey, "/") {
+				fileName = filepath.Base(fileKey)
+			}
+			// construct local file name
+			filePath := dirName + "/" + fileName
+			file, err := os.Create(filePath)
+			if err != nil {
+				finalErr = err
+				return
+			}
+			totalBytes, elapsed, err := downloadFile(sess, bucket, fileKey, file)
+			if err == nil {
+				total += totalBytes
+				msg := fmt.Sprintf("Downloaded %d bytes for %s in %v", totalBytes,
+					filepath.Base(fileKey), elapsed.Round(time.Millisecond))
+				gplog.Verbose(msg)
+				fmt.Println(msg)
+			} else {
+				finalErr = err
+				_ = os.Remove(filePath)
+			}
+			_ = file.Close()
+		}(fileKey)
+	}
+	wg.Wait()
+	return finalErr
 }
 
 func BackupData(c *cli.Context) error {
