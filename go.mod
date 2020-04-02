@@ -3,7 +3,6 @@ module github.com/greenplum-db/gpbackup-s3-plugin
 go 1.13
 
 require (
-	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d
 	github.com/aws/aws-sdk-go v1.29.15
 	github.com/greenplum-db/gp-common-go-libs v1.0.2
 	github.com/onsi/ginkgo v1.12.0

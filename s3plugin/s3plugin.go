@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alecthomas/units"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -484,9 +483,10 @@ func ShouldEnableEncryption(config *PluginConfig) bool {
      The limit would be reached at chunk number 3155 in our case
      Chunk sizes = 8, 9, 10, ..., 3155
  */
-const DownloadChunkSize = int64(units.Mebibyte) * 8
-const DownloadChunkIncrement = int64(units.Mebibyte) * 1
-const UploadChunkSize = int64(units.Mebibyte) * 500
+const Mebibyte = 1024 * 1024
+const DownloadChunkSize = int64(Mebibyte) * 8
+const DownloadChunkIncrement = int64(Mebibyte) * 1
+const UploadChunkSize = int64(Mebibyte) * 500
 const Concurrency = 6
 
 func uploadFile(sess *session.Session, bucket string, fileKey string,
