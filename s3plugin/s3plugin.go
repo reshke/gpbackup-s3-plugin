@@ -128,7 +128,7 @@ func readConfigAndStartSession(c *cli.Context, operation string) (*PluginConfig,
 }
 
 func ShouldEnableDebug(config *PluginConfig, operation string) {
-	gplog.InitializeLogging(operation, "")
+	gplog.InitializeLogging(strings.ToLower(operation), "")
 	verbosity := gplog.LOGINFO
 	if strings.EqualFold(config.Options["debug"], "on") {
 		verbosity = gplog.LOGDEBUG
