@@ -22,6 +22,7 @@ options:
   bucket: <s3-bucket>
   folder: <s3-location>
   encryption: [on|off]
+  http_proxy: <http-proxy>
  ```
 
 **executablepath:**
@@ -63,6 +64,10 @@ The S3 location for backups. During a backup operation, the plugin creates the S
 **encryption:**
 
 Enable or disable SSL encryption to connect to S3. Valid values are on and off. On by default.
+
+**http_proxy:**
+
+Your http proxy url
 
 ## Example
 This is an example S3 storage plugin configuration file that is used in the next gpbackup example command. The name of the file is s3-test-config.yaml.
