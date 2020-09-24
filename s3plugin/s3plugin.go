@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -117,6 +119,17 @@ func readConfigAndStartSession(c *cli.Context, operation string) (*PluginConfig,
 			credentials.NewStaticCredentials(
 				config.Options["aws_access_key_id"],
 				config.Options["aws_secret_access_key"], ""))
+	}
+
+	if config.Options["http_proxy"] != "" {
+		httpclient := &http.Client{
+			Transport: &http.Transport{
+				Proxy: func(*http.Request) (*url.URL, error) {
+					return url.Parse(config.Options["http_proxy"])
+				},
+			},
+		}
+		awsConfig.WithHTTPClient(httpclient)
 	}
 
 	sess, err := session.NewSession(awsConfig)
