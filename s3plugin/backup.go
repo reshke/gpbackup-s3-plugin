@@ -227,7 +227,7 @@ func uploadFile(sess *session.Session, config *PluginConfig, bucket string, file
 
 func GetUploadChunkSize(config *PluginConfig) (int64, error) {
 	uploadChunkSize := UploadChunkSize
-	if sizeFromConfig, ok := config.Options["upload_chunk_size"]; ok {
+	if sizeFromConfig, ok := config.Options["backup_multipart_chunksize"]; ok {
 		size, err := bytesize.Parse(sizeFromConfig)
 		if err != nil {
 			return 0, err
@@ -239,7 +239,7 @@ func GetUploadChunkSize(config *PluginConfig) (int64, error) {
 
 func GetUploadConcurrency(config *PluginConfig) (int, error) {
 	uploadConcurrency := Concurrency
-	if val, ok := config.Options["upload_concurrency"]; ok {
+	if val, ok := config.Options["backup_max_concurrent_requests"]; ok {
 		r, err := strconv.Atoi(val)
 		if err != nil {
 			return 0, err

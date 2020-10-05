@@ -22,14 +22,14 @@ var _ = Describe("s3_plugin tests", func() {
 		pluginConfig = &s3plugin.PluginConfig{
 			ExecutablePath: "/tmp/location",
 			Options: map[string]string{
-				"aws_access_key_id":     "12345",
-				"aws_secret_access_key": "6789",
-				"bucket":                "bucket_name",
-				"folder":                "folder_name",
-				"region":                "region_name",
-				"endpoint":              "endpoint_name",
-				"upload_concurrency":    "5",
-				"upload_chunk_size":     "7MB",
+				"aws_access_key_id":              "12345",
+				"aws_secret_access_key":          "6789",
+				"bucket":                         "bucket_name",
+				"folder":                         "folder_name",
+				"region":                         "region_name",
+				"endpoint":                       "endpoint_name",
+				"backup_max_concurrent_requests": "5",
+				"backup_multipart_chunksize":     "7MB",
 			},
 		}
 	})
@@ -129,8 +129,8 @@ var _ = Describe("s3_plugin tests", func() {
 			Expect(concurrency).To(Equal(5))
 		})
 		It("uses default values if upload params are not specified", func() {
-			delete(pluginConfig.Options, "upload_chunk_size")
-			delete(pluginConfig.Options, "upload_concurrency")
+			delete(pluginConfig.Options, "backup_multipart_chunksize")
+			delete(pluginConfig.Options, "backup_max_concurrent_requests")
 
 			chunkSize, err := s3plugin.GetUploadChunkSize(pluginConfig)
 			Expect(err).NotTo(HaveOccurred())
