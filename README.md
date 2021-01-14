@@ -7,6 +7,37 @@ If you perform a backup operation with the gpbackup option --plugin-config, you 
 
 The S3 plugin supports both AWS and custom storage servers that implement the S3 interface.
 
+## Pre-Requisites
+
+The project requires the Go Programming language version 1.13 or higher. Follow the directions [here](https://golang.org/doc/) for installation, usage and configuration instructions.
+
+## Downloading
+
+```bash
+go get github.com/greenplum-db/gpbackup-s3-plugin/...
+```
+
+## Building and installing binaries
+Switch your current working directory to the above `gpbackup_s3_plugin` source directory
+
+**Build**
+```bash
+make build
+```
+This will build the `gpbackup_s3_plugin` binary in `$HOME/go/bin`.
+
+**Install**
+```bash
+make build
+```
+This will install the `gpbackup_s3_plugin` binary on all the segments hosts
+
+## Test
+```bash
+make test
+```
+Runs the unit tests
+
 ## S3 Storage Plugin Configuration File Format
 The configuration file specifies the absolute path to the gpbackup_s3_plugin executable, AWS connection credentials, and S3 location.
 
@@ -25,49 +56,24 @@ options:
   http_proxy: <http-proxy>
  ```
 
-**executablepath:**
+`executablepath` is the absolute path to the plugin executable (eg: use the fully expanded path of $GPHOME/bin/gpbackup_s3_plugin).
 
-Absolute path to the plugin executable. For example, the Greenplum Database installation location is $GPHOME/bin/gpbackup_s3_plugin.
+Below are the s3 plugin options
 
-**options:**
-
-Begins the S3 storage plugin options section.
-
-**region:**
-
-The AWS region.
-
-Note: This parameter will be ignored if `endpoint` is specified.
-
-**endpoint:**
-
-The endpoint to a server implementing the S3 interface.
-
-Note: This parameter should not be specified if using AWS.
-
-**aws_access_key_id:**
-
-The AWS S3 ID to access the S3 bucket location that stores backup files.
-
-**aws_secret_access_key:**
-
-AWS S3 passcode for the S3 ID to access the S3 bucket location.
-
-**bucket:**
-
-The name of the S3 bucket. The bucket must exist with the necessary permissions.
-
-**folder:**
-
-The S3 location for backups. During a backup operation, the plugin creates the S3 location if it does not exist in the S3 bucket.
-
-**encryption:**
-
-Enable or disable SSL encryption to connect to S3. Valid values are on and off. On by default.
-
-**http_proxy:**
-
-Your http proxy url
+| Option Name | Description |
+| --- | --- |
+| `region`      | aws region (will be ignored if `endpoint` is specified |
+| `endpoint`    | endpoint to a server implementing the S3 interface |
+| `aws_access_key_id`      | AWS S3 ID to access the S3 bucket location that stores backup files |
+| `aws_secret_access_key`       | AWS S3 passcode for the S3 ID to access the S3 bucket location |
+| `bucket` | name of the S3 bucket. The bucket must exist with the necessary permissions |
+| `folder` | S3 location for backups. During a backup operation, the plugin creates the S3 location if it does not exist in the S3 bucket. |
+| `encryption` | Enable or disable SSL encryption to connect to S3. Valid values are on and off. On by default |
+| `http_proxy` | your http proxy url |
+| `backup_max_concurrent_requests` | concurrency level for any file's backup request |
+| `backup_multipart_chunksize` | maximum buffer/chunk size for multipart transfers during backup |
+| `restore_max_concurrent_requests` | concurrency level for any file's restore request |
+| `restore_multipart_chunksize` | maximum buffer/chunk size for multipart transfers during restore |
 
 ## Example
 This is an example S3 storage plugin configuration file that is used in the next gpbackup example command. The name of the file is s3-test-config.yaml.
