@@ -28,9 +28,9 @@ This will build the `gpbackup_s3_plugin` binary in `$HOME/go/bin`.
 
 **Install**
 ```bash
-make build
+make install
 ```
-This will install the `gpbackup_s3_plugin` binary on all the segments hosts
+This will install the `gpbackup_s3_plugin` binary on all the segments hosts. Note that GPDB must be sourced for this to work.
 
 ## Test
 ```bash
