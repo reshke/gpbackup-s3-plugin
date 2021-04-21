@@ -27,7 +27,7 @@ var Version string
 const apiVersion = "0.4.0"
 const Mebibyte = 1024 * 1024
 const Concurrency = 6
-const UploadChunkSize = int64(Mebibyte) * 10 // default 10MB
+const UploadChunkSize = int64(Mebibyte) * 10   // default 10MB
 const DownloadChunkSize = int64(Mebibyte) * 10 // default 10MB
 
 type Scope string
@@ -101,6 +101,36 @@ func ValidateConfig(config *PluginConfig) error {
 	return nil
 }
 
+func setupReqProxy(endpointSource string) (string, error) {
+	resp, err := http.Get(endpointSource)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != 200 {
+		return "", err
+	}
+	defer resp.Body.Close()
+	bytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(bytes), nil
+}
+
+func resolveEndpoint(config *PluginConfig) string {
+	endpointSource := config.Options["endpoint_source"]
+	if endpointSource != "" {
+		endpoint, err := setupReqProxy(endpointSource)
+		if err == nil {
+			return endpoint
+		}
+		// else fallback to default endpoint
+	}
+
+	return config.Options["endpoint"]
+}
+
 func readConfigAndStartSession(c *cli.Context, operation string) (*PluginConfig, *session.Session, error) {
 	configPath := c.Args().Get(0)
 	config, err := readAndValidatePluginConfig(configPath)
@@ -111,7 +141,7 @@ func readConfigAndStartSession(c *cli.Context, operation string) (*PluginConfig,
 
 	awsConfig := aws.NewConfig().
 		WithRegion(config.Options["region"]).
-		WithEndpoint(config.Options["endpoint"]).
+		WithEndpoint(resolveEndpoint(config)).
 		WithS3ForcePathStyle(true).
 		WithDisableSSL(disableSSL).
 		WithUseDualStack(true)

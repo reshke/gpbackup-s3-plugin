@@ -304,11 +304,11 @@ func downloadFileInParallel(downloader *s3manager.Downloader, downloadConcurrenc
 	for i := 0; i < numberOfWorkers; i++ {
 		go func(id int) {
 			for j := range jobs {
-				buffer := <- downloadBuffers
+				buffer := <-downloadBuffers
 				chunkStart := time.Now()
 				byteRange := fmt.Sprintf("bytes=%d-%d", j.startByte, j.endByte)
-				if j.endByte - j.startByte + 1 != downloadChunkSize {
-					buffer = make([]byte, j.endByte - j.startByte + 1)
+				if j.endByte-j.startByte+1 != downloadChunkSize {
+					buffer = make([]byte, j.endByte-j.startByte+1)
 				}
 				bufferPointers[j.chunkIndex] = &buffer
 				chunkBytes, err := downloader.Download(
